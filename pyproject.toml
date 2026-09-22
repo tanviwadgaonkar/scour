@@ -1,0 +1,22 @@
+[project]
+name = "scour"
+version = "0.2.0"
+description = "A small search engine built from scratch: inverted index, BM25, dense and hybrid retrieval, cross-encoder reranking, and an IR evaluation harness."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "fastapi>=0.110", "httpx>=0.27"]
+neural = ["sentence-transformers>=3.0"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["scour*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
