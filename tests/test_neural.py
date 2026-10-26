@@ -33,8 +33,8 @@ def test_dense_ranks_by_cosine(dense):
 
 
 def test_dense_roundtrip(dense, tmp_path):
-    dense.save(tmp_path / "idx")
-    loaded = DenseIndex.load(tmp_path / "idx", BagOfWordsEmbedder())
+    dense.save(tmp_path / "idx", fingerprint="fp")
+    loaded = DenseIndex.load(tmp_path / "idx", BagOfWordsEmbedder(), fingerprint="fp")
     assert loaded.search("heat", k=1)[0][0] == dense.search("heat", k=1)[0][0]
 
 
@@ -71,3 +71,34 @@ def test_reranker_reorders_first_stage(index):
 
 def test_reranker_empty_query(index):
     assert RerankedRanker(BM25(index), ReverseScorer(), {}, top_n=3).search("zzzz") == []
+
+
+def test_dense_cache_is_reused_only_for_the_same_corpus(tmp_path):
+    class CountingEmbedder(BagOfWordsEmbedder):
+        calls = 0
+
+        def encode(self, texts):
+            CountingEmbedder.calls += 1
+            return super().encode(texts)
+
+    emb = CountingEmbedder()
+    path = tmp_path / "idx"
+    DenseIndex.cached(path, DOCS, emb, "toy")
+    DenseIndex.cached(path, DOCS, emb, "toy")
+    assert CountingEmbedder.calls == 1  # second call hit the cache
+
+    changed = DOCS[:-1] + [("4", "Shock waves", "a completely different abstract")]
+    rebuilt = DenseIndex.cached(path, changed, emb, "toy")
+    assert CountingEmbedder.calls == 2  # corpus changed -> re-embedded, not stale vectors
+    assert rebuilt.doc_ids == [d[0] for d in changed]
+
+    DenseIndex.cached(path, changed, emb, "another-model")
+    assert CountingEmbedder.calls == 3  # model changed -> re-embedded
+
+
+def test_legacy_cache_without_fingerprint_is_ignored(tmp_path, dense):
+    import json
+
+    np.save(tmp_path / "idx.npy", dense.vectors)
+    (tmp_path / "idx.json").write_text(json.dumps(dense.doc_ids))  # v0.2 format
+    assert DenseIndex.load(tmp_path / "idx", BagOfWordsEmbedder(), "anything") is None

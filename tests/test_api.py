@@ -38,3 +38,10 @@ def test_unknown_mode_rejected(client):
 def test_home_page_renders(client):
     r = client.get("/")
     assert r.status_code == 200 and "scour" in r.text
+
+
+def test_home_page_escapes_results(client):
+    # Titles and snippets come from whatever corpus SCOUR_DATA points at.
+    html = client.get("/").text
+    assert "const esc=" in html
+    assert "${h.snippet}" not in html and "${esc(h.snippet)}" in html

@@ -13,3 +13,9 @@ DOCS = [
 @pytest.fixture
 def index() -> InvertedIndex:
     return InvertedIndex.build(DOCS)
+
+
+@pytest.fixture
+def body_index() -> InvertedIndex:
+    """Bodies only: for tests that hand-check positions, lengths and scores."""
+    return InvertedIndex.build(DOCS, index_titles=False)

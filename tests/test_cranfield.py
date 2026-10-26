@@ -59,3 +59,21 @@ def test_convert_uses_positional_query_ids(tmp_path):
     qrels = (tmp_path / "qrels.tsv").read_text().splitlines()
     assert qrels[1] == "1\t2\t2"
     assert qrels[2] == "1\t1\t0"
+
+
+def test_download_rejects_checksum_mismatch(tmp_path, monkeypatch):
+    import io
+    import pytest
+    from scour.eval import cranfield
+
+    class FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(cranfield.urllib.request, "urlopen", lambda *a, **k: FakeResponse(b"tampered"))
+    with pytest.raises(SystemExit, match="checksum mismatch"):
+        cranfield.download(tmp_path)
+    assert not (tmp_path / "docs.jsonl").exists()
