@@ -7,6 +7,10 @@ on:
     paths: ["scour/**", ".github/workflows/benchmark-neural.yml"]
   workflow_dispatch:
 
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
 jobs:
   cranfield:
     runs-on: ubuntu-latest
