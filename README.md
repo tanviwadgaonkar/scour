@@ -2,9 +2,11 @@
 
 [![CI](https://github.com/tanviwadgaonkar/scour/actions/workflows/ci.yml/badge.svg)](https://github.com/tanviwadgaonkar/scour/actions/workflows/ci.yml) [![Neural benchmark](https://github.com/tanviwadgaonkar/scour/actions/workflows/benchmark-neural.yml/badge.svg)](https://github.com/tanviwadgaonkar/scour/actions/workflows/benchmark-neural.yml)
 
+**Status:** implemented and tested (50 offline tests). Ranking quality is measured on the Cranfield benchmark in CI, with the real embedding and reranker models. The Docker image is built and smoke-tested in CI. Not deployed.
+
 A search engine built from scratch in Python: tokeniser, inverted index, BM25 ranking, quoted phrase queries, then dense retrieval, hybrid fusion and a cross-encoder reranker on top, all measured on a public IR benchmark with the same harness.
 
-No search libraries for the core. The point was to build every stage myself and measure whether each one actually helps.
+No search libraries for the core: every stage is implemented from scratch, so its effect can be measured on its own.
 
 ```
                  ┌─> BM25 over inverted index ─┐
