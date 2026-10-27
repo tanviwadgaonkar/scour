@@ -69,7 +69,7 @@ def health() -> dict:
 
 
 @app.get("/search")
-def search(q: str = Query(..., min_length=1), mode: str = "bm25", k: int = Query(10, ge=1, le=50)) -> dict:
+def search(q: str = Query(..., min_length=1, max_length=500), mode: str = "bm25", k: int = Query(10, ge=1, le=50)) -> dict:
     if mode not in STATE["modes"]:
         raise HTTPException(400, f"mode must be one of {STATE['modes']}")
     start = time.perf_counter()

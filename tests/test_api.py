@@ -50,3 +50,8 @@ def test_home_page_escapes_results(client):
 def test_health_reports_loaded_corpus(client):
     body = client.get("/health").json()
     assert body == {"status": "ok", "docs": 4, "modes": ["bm25"]}
+
+
+def test_overlong_query_is_rejected(client):
+    # Rerank cost grows with query length; cap it at the API boundary.
+    assert client.get("/search", params={"q": "wing " * 200}).status_code == 422

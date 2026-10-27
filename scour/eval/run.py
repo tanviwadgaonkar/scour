@@ -52,7 +52,7 @@ def evaluate(ranker, queries: list[dict], qrels: dict[str, dict[str, int]], k: i
     return {
         f"P@{k}": statistics.mean(p),
         f"R@{k}": statistics.mean(r),
-        "MAP": statistics.mean(ap),
+        "MAP@100": statistics.mean(ap),  # rankings are cut at 100 docs
         f"nDCG@{k}": statistics.mean(nd),
         "p50 ms": statistics.median(latencies),
         "p95 ms": sorted(latencies)[int(0.95 * (len(latencies) - 1))],

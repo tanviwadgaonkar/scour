@@ -20,7 +20,7 @@ query ──> tokenizer                            ├─> RRF fusion ──> cr
 
 ```bash
 pip install -e ".[dev]"
-pytest                                   # 49 tests, offline, a few seconds
+pytest                                   # 50 tests, offline, a few seconds
 
 python -m scour.eval.cranfield           # downloads the Cranfield collection to data/cranfield
 python -m scour index  --docs data/cranfield/docs.jsonl --out index.pkl
@@ -38,7 +38,7 @@ SCOUR_DATA=data/cranfield uvicorn scour.api:app   # http://127.0.0.1:8000
 
 Output of `python -m scour.eval.run --data data/cranfield --neural`, run by the [neural benchmark workflow](.github/workflows/benchmark-neural.yml) on a GitHub-hosted `ubuntu-latest` CPU runner:
 
-| Ranker | P@10 | R@10 | MAP | nDCG@10 | p50 ms | p95 ms |
+| Ranker | P@10 | R@10 | MAP@100 | nDCG@10 | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|
 | TF-IDF (baseline) | 0.184 | 0.310 | 0.226 | 0.284 | 0.44 | 0.63 |
 | BM25 (k1=1.5, b=0.75) | 0.232 | 0.389 | 0.276 | 0.348 | 0.73 | 1.22 |
@@ -53,7 +53,7 @@ Index build: 0.13 s for 1,400 docs / 7,437 terms; embedding the corpus: 25 s. La
 - **BM25 beats TF-IDF by +0.064 nDCG@10** (0.348 vs 0.284): term-frequency saturation and length normalisation matter.
 - **Dense retrieval beats BM25** (0.383), and **hybrid RRF beats both** (0.408): the two rankers fail on different queries, so fusing ranks helps — at tens of milliseconds per query.
 - **The cross-encoder reranker makes results worse** here (0.378 < 0.408) and costs 2–3.5 s per query. The `ms-marco-MiniLM-L-6-v2` model is trained on web search queries; Cranfield is 1960s aerodynamics abstracts with very technical queries. A reranker is only an improvement if it fits the domain — so the default API mode stays BM25 / hybrid, and this is reported rather than hidden.
-- **Indexing titles helps BM25:** with `--text-only` (bodies only), BM25 drops to nDCG@10 0.334 and MAP 0.266. Cranfield abstracts repeat their title, so indexing it again works as a 2× title-field boost.
+- **Indexing titles helps BM25:** with `--text-only` (bodies only), BM25 drops to nDCG@10 0.334 and MAP@100 0.266. Cranfield abstracts repeat their title, so indexing it again works as a 2× title-field boost.
 
 ## Design decisions
 
