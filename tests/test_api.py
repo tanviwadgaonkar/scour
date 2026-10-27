@@ -45,3 +45,8 @@ def test_home_page_escapes_results(client):
     html = client.get("/").text
     assert "const esc=" in html
     assert "${h.snippet}" not in html and "${esc(h.snippet)}" in html
+
+
+def test_health_reports_loaded_corpus(client):
+    body = client.get("/health").json()
+    assert body == {"status": "ok", "docs": 4, "modes": ["bm25"]}

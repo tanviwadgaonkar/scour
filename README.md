@@ -12,6 +12,10 @@ query ──> tokenizer                            ├─> RRF fusion ──> cr
                  └─> cosine over dense index ──┘
 ```
 
+![Scour search UI: a quoted phrase query over the Cranfield collection](docs/screenshot-search.png)
+
+*The bundled UI running locally (`uvicorn scour.api:app`), BM25 mode, query `"boundary layer" transition`. The phrase filter also matches the hyphenated "boundary-layer", because the tokenizer splits on non-alphanumerics.*
+
 ## Quick start
 
 ```bash
@@ -102,6 +106,23 @@ tests/           pytest suite covering every module
 - [ ] Stage 3: Porter stemmer as a measured change; k1/b sweep; latency benchmark script
 - [ ] Stage 4: autocomplete (trie, top-k by frequency, edit-distance typo tolerance)
 - [ ] Stage 5: compressed postings (delta + varint) and index size comparison
+
+## Deployment
+
+The Docker image builds the index at start-up and serves BM25 search, with `/health` for health checks. `render.yaml` is a Render Blueprint for the free web-service tier: in Render, choose **New → Blueprint**, select this repo, and deploy. Neural modes stay off in that image (`SCOUR_NEURAL=0`), because torch and two models don't fit a free instance's memory. CI builds the same image and smoke-tests `/search` on every push.
+
+```bash
+docker build -t scour . && docker run -p 8000:8000 scour     # http://localhost:8000, /health, /docs
+```
+
+No public demo is deployed yet.
+
+## Known limitations
+
+- No stemming yet: "transitions" doesn't match "transition" (Stage 3 on the roadmap).
+- The index is rebuilt in memory at start-up; that's fine for 1,400 documents but not for millions (no on-disk segments or compression yet).
+- The cross-encoder reranker is out of domain for Cranfield and lowers quality (see Results).
+- Cranfield is small and old; results here don't transfer automatically to web-scale or modern corpora.
 
 ## Security notes
 

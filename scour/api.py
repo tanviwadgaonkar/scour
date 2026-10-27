@@ -62,6 +62,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="scour", version="0.2.0", lifespan=lifespan)
 
 
+@app.get("/health")
+def health() -> dict:
+    """Liveness + readiness for load balancers and hosting health checks."""
+    return {"status": "ok", "docs": len(STATE.get("texts", {})), "modes": STATE.get("modes", [])}
+
+
 @app.get("/search")
 def search(q: str = Query(..., min_length=1), mode: str = "bm25", k: int = Query(10, ge=1, le=50)) -> dict:
     if mode not in STATE["modes"]:

@@ -1,0 +1,11 @@
+# Render Blueprint (free web service). Render builds the Dockerfile, which
+# downloads and checksums Cranfield at build time; BM25 mode only (no torch).
+services:
+  - type: web
+    name: scour
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SCOUR_NEURAL
+        value: "0"
