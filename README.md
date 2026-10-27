@@ -20,7 +20,7 @@ query ──> tokenizer                            ├─> RRF fusion ──> cr
 
 ```bash
 pip install -e ".[dev]"
-pytest                                   # 48 tests, offline, a few seconds
+pytest                                   # 49 tests, offline, a few seconds
 
 python -m scour.eval.cranfield           # downloads the Cranfield collection to data/cranfield
 python -m scour index  --docs data/cranfield/docs.jsonl --out index.pkl
@@ -46,13 +46,13 @@ Output of `python -m scour.eval.run --data data/cranfield --neural`, run by the 
 | **Hybrid (BM25 + dense, RRF)** | **0.264** | **0.438** | **0.340** | **0.408** | 17.93 | 24.00 |
 | Hybrid + cross-encoder rerank (top 50) | 0.250 | 0.405 | 0.308 | 0.378 | 1983.41 | 2162.85 |
 
-Index build: 0.13 s for 1,400 docs / 7,437 terms; embedding the corpus: 25 s. Latency is per query, single-threaded, CPU only. The lexical rows are also re-run on every push by the main CI workflow and match a local Windows run exactly.
+Index build: 0.13 s for 1,400 docs / 7,437 terms; embedding the corpus: 25 s. Latency is per query, single-threaded, CPU only, and **varies between runs on shared GitHub runners** (a later run of the same code measured p50 0.96 ms BM25, 29.7 ms hybrid and 3.4 s rerank): read the latency columns as orders of magnitude; the quality metrics are identical on every run. The lexical rows are also re-run on every push by the main CI workflow and match a local Windows run exactly.
 
 **What the numbers say**
 
 - **BM25 beats TF-IDF by +0.064 nDCG@10** (0.348 vs 0.284): term-frequency saturation and length normalisation matter.
-- **Dense retrieval beats BM25** (0.383), and **hybrid RRF beats both** (0.408): the two rankers fail on different queries, so fusing ranks helps — at ~18 ms per query.
-- **The cross-encoder reranker makes results worse** here (0.378 < 0.408) and costs ~2 s per query. The `ms-marco-MiniLM-L-6-v2` model is trained on web search queries; Cranfield is 1960s aerodynamics abstracts with very technical queries. A reranker is only an improvement if it fits the domain — so the default API mode stays BM25 / hybrid, and this is reported rather than hidden.
+- **Dense retrieval beats BM25** (0.383), and **hybrid RRF beats both** (0.408): the two rankers fail on different queries, so fusing ranks helps — at tens of milliseconds per query.
+- **The cross-encoder reranker makes results worse** here (0.378 < 0.408) and costs 2–3.5 s per query. The `ms-marco-MiniLM-L-6-v2` model is trained on web search queries; Cranfield is 1960s aerodynamics abstracts with very technical queries. A reranker is only an improvement if it fits the domain — so the default API mode stays BM25 / hybrid, and this is reported rather than hidden.
 - **Indexing titles helps BM25:** with `--text-only` (bodies only), BM25 drops to nDCG@10 0.334 and MAP 0.266. Cranfield abstracts repeat their title, so indexing it again works as a 2× title-field boost.
 
 ## Design decisions
