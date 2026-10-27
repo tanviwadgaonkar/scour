@@ -58,7 +58,10 @@ class SearchEngine:
         self.ranker = BM25(index, k1=k1, b=b)
 
     def search(self, query: str, k: int = 10) -> list[Hit]:
-        phrases = PHRASE_RE.findall(query)
+        # A quoted phrase made only of stopwords ("of the") has no indexed
+        # terms, so it cannot constrain anything; ignore it rather than
+        # filtering every document out.
+        phrases = [p for p in PHRASE_RE.findall(query) if tokenize(p)]
         scores = self.ranker.score_all(query)
 
         if phrases:

@@ -18,8 +18,8 @@ def test_rare_term_outranks_common_term(index):
     assert results[0][0] == "3"
 
 
-def test_repeated_term_scores_higher_but_saturates(index):
-    bm25 = BM25(index)
+def test_repeated_term_scores_higher_but_saturates(body_index):
+    bm25 = BM25(body_index)
     scores = bm25.score_all("boundary")
     assert scores["4"] > scores["1"]  # tf=2 beats tf=1
     # Saturation: doubling tf does not double the score.
@@ -30,9 +30,9 @@ def test_unknown_terms_are_ignored(index):
     assert BM25(index).search("zzzz") == []
 
 
-def test_score_matches_hand_computation(index):
-    bm25 = BM25(index, k1=1.5, b=0.75)
-    tf, dl, avgdl = 1, index.doc_lengths["3"], index.avg_doc_length
+def test_score_matches_hand_computation(body_index):
+    bm25 = BM25(body_index, k1=1.5, b=0.75)
+    tf, dl, avgdl = 1, body_index.doc_lengths["3"], body_index.avg_doc_length
     idf = math.log(1 + (4 - 1 + 0.5) / (1 + 0.5))
     expected = idf * tf * (1.5 + 1) / (tf + 1.5 * (1 - 0.75 + 0.75 * dl / avgdl))
     assert bm25.score_all("wing")["3"] == pytest.approx(expected)

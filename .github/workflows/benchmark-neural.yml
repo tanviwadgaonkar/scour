@@ -1,0 +1,29 @@
+name: Neural benchmark
+
+# Dense, hybrid and reranked retrieval need torch + two small models
+# (~100 MB), so this runs separately from the fast test suite.
+on:
+  push:
+    paths: ["scour/**", ".github/workflows/benchmark-neural.yml"]
+  workflow_dispatch:
+
+# Least privilege: these jobs only read the repository.
+permissions:
+  contents: read
+
+jobs:
+  cranfield:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[neural]" --extra-index-url https://download.pytorch.org/whl/cpu
+      - run: python -m scour.eval.cranfield --out data/cranfield
+      - run: python -m scour.eval.run --data data/cranfield --neural | tee results.md
+      - name: Publish the table
+        run: |
+          cat results.md >> "$GITHUB_STEP_SUMMARY"
+          python -c "import sys; t=open('results.md').read(); print('::notice title=Cranfield results::' + t.replace('%','%25').replace('\n','%0A'))"

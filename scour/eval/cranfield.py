@@ -17,13 +17,18 @@ are well documented. Two of them matter here:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import tarfile
 import urllib.request
 from pathlib import Path
 
-URL = "http://ir.dcs.gla.ac.uk/resources/test_collections/cran/cran.tar.gz"
+URL = "https://ir.dcs.gla.ac.uk/resources/test_collections/cran/cran.tar.gz"
+# SHA-256 of the archive as published (verified 2026-10-26). A mismatch means
+# the download was corrupted or the file changed, and every reported number
+# would silently refer to different data.
+SHA256 = "8c48a8412e4a7e6e0dd5af99c959f8d75fdf88135602adc1a56aa22770652d64"
 
 
 def parse_cran_blocks(text: str) -> list[dict[str, str]]:
@@ -80,6 +85,9 @@ def download(out: Path) -> None:
     print(f"downloading {URL} ...")
     with urllib.request.urlopen(URL, timeout=60) as resp:
         payload = resp.read()
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != SHA256:
+        raise SystemExit(f"checksum mismatch for {URL}: got {digest}, expected {SHA256}")
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
         members = {m.name.split("/")[-1]: m for m in tar.getmembers() if m.isfile()}
         def read(name: str) -> str:

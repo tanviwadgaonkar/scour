@@ -30,9 +30,10 @@ STATE: dict = {}
 def _load() -> None:
     data = Path(os.environ.get("SCOUR_DATA", "data/cranfield"))
     docs = load_jsonl(data / "docs.jsonl")
+    triples = [(d["id"], d.get("title", ""), d["text"]) for d in docs]
     STATE["texts"] = {d["id"]: d["text"] for d in docs}
     STATE["titles"] = {d["id"]: d.get("title", "") for d in docs}
-    index = InvertedIndex.build((d["id"], d.get("title", ""), d["text"]) for d in docs)
+    index = InvertedIndex.build(triples)
     STATE["bm25"] = SearchEngine(index)
     STATE["modes"] = ["bm25"]
 
@@ -42,12 +43,7 @@ def _load() -> None:
             from scour.rerank import CrossEncoderScorer, RerankedRanker
 
             embedder = SentenceTransformerEmbedder()
-            cache = data / "dense_index"
-            if cache.with_suffix(".npy").exists():
-                dense = DenseIndex.load(cache, embedder)
-            else:
-                dense = DenseIndex.build(((d["id"], d.get("title", ""), d["text"]) for d in docs), embedder)
-                dense.save(cache)
+            dense = DenseIndex.cached(data / "dense_index", triples, embedder, embedder.model_name)
             hybrid = HybridRanker([BM25(index), dense])
             STATE["dense"] = dense
             STATE["hybrid"] = hybrid
@@ -66,8 +62,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="scour", version="0.2.0", lifespan=lifespan)
 
 
+@app.get("/health")
+def health() -> dict:
+    """Liveness + readiness for load balancers and hosting health checks."""
+    return {"status": "ok", "docs": len(STATE.get("texts", {})), "modes": STATE.get("modes", [])}
+
+
 @app.get("/search")
-def search(q: str = Query(..., min_length=1), mode: str = "bm25", k: int = Query(10, ge=1, le=50)) -> dict:
+def search(q: str = Query(..., min_length=1, max_length=500), mode: str = "bm25", k: int = Query(10, ge=1, le=50)) -> dict:
     if mode not in STATE["modes"]:
         raise HTTPException(400, f"mode must be one of {STATE['modes']}")
     start = time.perf_counter()
@@ -91,8 +93,10 @@ input,select,button{{font-size:16px;padding:8px}} input{{width:60%}} .hit{{margi
 <h2>scour</h2><p class="m">A search engine built from scratch. Corpus: Cranfield aerodynamics abstracts.</p>
 <form onsubmit="go();return false"><input id="q" placeholder="boundary layer transition" autofocus>
 <select id="mode">{options}</select> <button>Search</button></form><div id="out"></div>
-<script>async function go(){{const q=document.getElementById('q').value,m=document.getElementById('mode').value;
-const r=await fetch(`/search?q=${{encodeURIComponent(q)}}&mode=${{m}}`);const d=await r.json();
-document.getElementById('out').innerHTML=`<p class="m">${{d.hits.length}} results in ${{d.latency_ms}} ms (${{d.mode}})</p>`+
-d.hits.map((h,i)=>`<div class="hit"><p><span class="t">${{i+1}}. ${{h.title||'doc '+h.id}}</span> <span class="m">score ${{h.score}}</span></p><p>${{h.snippet}}...</p></div>`).join('');}}</script>
+<script>const esc=s=>String(s).replace(/[&<>"']/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}})[c]);
+async function go(){{const q=document.getElementById('q').value,m=document.getElementById('mode').value;
+const r=await fetch(`/search?q=${{encodeURIComponent(q)}}&mode=${{encodeURIComponent(m)}}`);const d=await r.json();
+if(!r.ok){{document.getElementById('out').innerHTML=`<p class="m">${{esc(d.detail||r.status)}}</p>`;return;}}
+document.getElementById('out').innerHTML=`<p class="m">${{d.hits.length}} results in ${{esc(d.latency_ms)}} ms (${{esc(d.mode)}})</p>`+
+d.hits.map((h,i)=>`<div class="hit"><p><span class="t">${{i+1}}. ${{esc(h.title||'doc '+h.id)}}</span> <span class="m">score ${{esc(h.score)}}</span></p><p>${{esc(h.snippet)}}...</p></div>`).join('');}}</script>
 </body></html>"""

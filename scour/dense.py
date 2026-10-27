@@ -8,6 +8,7 @@ normalised at build time, so cosine similarity is a single matrix-vector dot.
 
 from __future__ import annotations
 
+import hashlib
 import heapq
 import json
 from pathlib import Path
@@ -27,6 +28,7 @@ class SentenceTransformerEmbedder:
     def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
         from sentence_transformers import SentenceTransformer  # optional dependency
 
+        self.model_name = model_name
         self.model = SentenceTransformer(model_name)
 
     def encode(self, texts: list[str]) -> np.ndarray:
@@ -61,13 +63,41 @@ class DenseIndex:
     def search(self, query: str, k: int = 10) -> list[tuple[str, float]]:
         return heapq.nlargest(k, self.score_all(query).items(), key=lambda kv: (kv[1], kv[0]))
 
-    # Cache the embeddings so evaluation runs do not re-embed the corpus.
-    def save(self, path: str | Path) -> None:
+    # Cache the embeddings so evaluation runs do not re-embed the corpus. The
+    # cache records a fingerprint of the corpus and the model; a cache built
+    # from different documents or a different model is never reused.
+    def save(self, path: str | Path, fingerprint: str = "") -> None:
         path = Path(path)
         np.save(path.with_suffix(".npy"), self.vectors)
-        path.with_suffix(".json").write_text(json.dumps(self.doc_ids))
+        path.with_suffix(".json").write_text(json.dumps({"fingerprint": fingerprint, "doc_ids": self.doc_ids}))
 
     @classmethod
-    def load(cls, path: str | Path, embedder: Embedder) -> "DenseIndex":
+    def load(cls, path: str | Path, embedder: Embedder, fingerprint: str = "") -> "DenseIndex | None":
+        """The cached index, or None if missing or built for another corpus/model."""
         path = Path(path)
-        return cls(json.loads(path.with_suffix(".json").read_text()), np.load(path.with_suffix(".npy")), embedder)
+        meta_path, vec_path = path.with_suffix(".json"), path.with_suffix(".npy")
+        if not (meta_path.exists() and vec_path.exists()):
+            return None
+        meta = json.loads(meta_path.read_text())
+        if not isinstance(meta, dict) or meta.get("fingerprint") != fingerprint:
+            return None
+        return cls(meta["doc_ids"], np.load(vec_path), embedder)
+
+    @classmethod
+    def cached(cls, path: str | Path, docs: list[tuple[str, str, str]], embedder: Embedder,
+               model_name: str = "") -> "DenseIndex":
+        """Load the cache if it matches ``docs`` and ``model_name``; otherwise build and save it."""
+        fp = corpus_fingerprint(docs, model_name)
+        index = cls.load(path, embedder, fp)
+        if index is None:
+            index = cls.build(docs, embedder)
+            index.save(path, fp)
+        return index
+
+
+def corpus_fingerprint(docs: list[tuple[str, str, str]], model_name: str = "") -> str:
+    h = hashlib.sha256(model_name.encode("utf-8"))
+    for doc_id, title, text in docs:
+        for part in (doc_id, title, text):
+            h.update(part.encode("utf-8") + b"\x00")
+    return h.hexdigest()

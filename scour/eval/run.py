@@ -52,7 +52,7 @@ def evaluate(ranker, queries: list[dict], qrels: dict[str, dict[str, int]], k: i
     return {
         f"P@{k}": statistics.mean(p),
         f"R@{k}": statistics.mean(r),
-        "MAP": statistics.mean(ap),
+        "MAP@100": statistics.mean(ap),  # rankings are cut at 100 docs
         f"nDCG@{k}": statistics.mean(nd),
         "p50 ms": statistics.median(latencies),
         "p95 ms": sorted(latencies)[int(0.95 * (len(latencies) - 1))],
@@ -68,6 +68,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--b", type=float, default=0.75)
     parser.add_argument("--neural", action="store_true", help="also evaluate dense, hybrid and reranked retrieval (needs the [neural] extra)")
     parser.add_argument("--rerank-top", type=int, default=50)
+    parser.add_argument("--text-only", action="store_true",
+                        help="index document bodies only (no titles) for BM25/TF-IDF")
     args = parser.parse_args(argv)
 
     data = Path(args.data)
@@ -76,9 +78,10 @@ def main(argv: list[str] | None = None) -> None:
     qrels = load_qrels(data / "qrels.tsv")
 
     start = time.perf_counter()
-    index = InvertedIndex.build((d["id"], d.get("title", ""), d["text"]) for d in docs)
+    triples = [(d["id"], d.get("title", ""), d["text"]) for d in docs]
+    index = InvertedIndex.build(triples, index_titles=not args.text_only)
     build_s = time.perf_counter() - start
-    print(f"index: {index.num_docs} docs, {index.num_terms} terms, avg length {index.avg_doc_length:.1f}, built in {build_s:.2f}s\n")
+    print(f"index ({'text only' if args.text_only else 'title + text'}): {index.num_docs} docs, {index.num_terms} terms, avg length {index.avg_doc_length:.1f}, built in {build_s:.2f}s\n")
 
     bm25 = BM25(index, args.k1, args.b)
     rows = {
@@ -91,14 +94,9 @@ def main(argv: list[str] | None = None) -> None:
         from scour.rerank import CrossEncoderScorer, RerankedRanker
 
         embedder = SentenceTransformerEmbedder()
-        cache = data / "dense_index"
-        if cache.with_suffix(".npy").exists():
-            dense = DenseIndex.load(cache, embedder)
-        else:
-            start = time.perf_counter()
-            dense = DenseIndex.build(((d["id"], d.get("title", ""), d["text"]) for d in docs), embedder)
-            dense.save(cache)
-            print(f"embedded corpus in {time.perf_counter() - start:.1f}s (cached to {cache}.npy)\n")
+        start = time.perf_counter()
+        dense = DenseIndex.cached(data / "dense_index", triples, embedder, embedder.model_name)
+        print(f"dense index ready in {time.perf_counter() - start:.1f}s (cached under {data / 'dense_index'}.npy)\n")
         texts = {d["id"]: d["text"] for d in docs}
         hybrid = HybridRanker([bm25, dense])
         rows["Dense (all-MiniLM-L6-v2)"] = evaluate(dense, queries, qrels, args.k)

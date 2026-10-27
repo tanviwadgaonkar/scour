@@ -21,3 +21,16 @@ def test_plain_query_returns_hits_with_titles(index):
 
 def test_phrase_with_no_matches_returns_nothing(index):
     assert SearchEngine(index).search('"supersonic wing"') == []
+
+
+def test_stopword_only_phrase_does_not_filter_everything(index):
+    engine = SearchEngine(index)
+    plain = [h.doc_id for h in engine.search("boundary", k=4)]
+    assert [h.doc_id for h in engine.search('"of the" boundary', k=4)] == plain
+
+
+def test_phrase_cannot_span_title_and_body():
+    from scour.index import InvertedIndex
+
+    idx = InvertedIndex.build([("1", "heat", "transfer coefficients")])
+    assert SearchEngine(idx).search('"heat transfer"') == []
