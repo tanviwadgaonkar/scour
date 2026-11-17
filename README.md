@@ -1,6 +1,6 @@
 # Scour
 
-A search engine built from scratch in Python: tokeniser, inverted index, BM25 ranking, quoted phrase queries, then dense retrieval, hybrid fusion and a cross-encoder reranker on top, all measured on a public IR benchmark with the same harness.
+A search engine built from scratch in Python: tokeniser, inverted index, BM25 ranking, quoted phrase queries, then dense retrieval, hybrid fusion and a cross-encoder reranker on top. TF-IDF and BM25 are measured on the public Cranfield benchmark with one harness; the dense, hybrid and reranker rows have not been run yet..
 
 No search libraries for the core. The point was to build every stage myself and measure whether each one actually helps.
 
@@ -10,7 +10,7 @@ query ──> tokenizer                            ├─> RRF fusion ──> cr
                  └─> cosine over dense index ──┘
 ```
 
-**Live demo:** _paste the deployed URL here_
+
 
 ## Quick start
 
@@ -32,17 +32,14 @@ SCOUR_DATA=data/cranfield uvicorn scour.api:app   # http://127.0.0.1:8000
 
 ## Results on Cranfield (1,400 docs, 225 queries)
 
-<!-- Paste the table printed by `python -m scour.eval.run` here. -->
-
 | Ranker | P@10 | R@10 | MAP | nDCG@10 | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|
-| TF-IDF (baseline) | | | | | | |
-| BM25 (k1=1.5, b=0.75) | | | | | | |
-| Dense (all-MiniLM-L6-v2) | | | | | | |
-| Hybrid (BM25 + dense, RRF) | | | | | | |
-| Hybrid + cross-encoder rerank (top 50) | | | | | | |
+| TF-IDF (baseline) | 0.165 | 0.280 | 0.200 | 0.253 | 0.68 | 1.18 |
+| BM25 (k1=1.5, b=0.75) | 0.220 | 0.368 | 0.266 | 0.334 | 1.09 | 2.00 |
 
-Index build time: __ s. Machine: __.
+Measured on a laptop with the default k1 and b. Only the two lexical rankers were run; the neural and hybrid rows were not.
+
+Index build time: 0.16 s for 1,400 documents.
 
 ## Design decisions
 
